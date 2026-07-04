@@ -15,7 +15,7 @@ CODE="${CODE:-}"                           # shared 6-char room code; both windo
                                            # (empty = old behavior: HOST creates a random code)
 WINDOWS="${WINDOWS:-2}"                    # 1 = just the host window (racing melchior bots)
 
-echo "== pulling HUMAN LOCKSTEP ROM from melchior (expect md5 b542d616...) =="
+echo "== pulling HUMAN LOCKSTEP ROM from melchior (expect md5 229cb90e...) =="
 scp "jsuppe@${MELCHIOR}:/mnt/micron/jsuppe/netpak/mk64_netpak_human.z64" "$ROM" || {
   echo "scp failed. Set MELCHIOR=<ip> or copy the ROM to $ROM manually."; exit 1; }
 md5 "$ROM" 2>/dev/null || md5sum "$ROM" 2>/dev/null
