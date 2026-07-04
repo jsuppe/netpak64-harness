@@ -1,0 +1,57 @@
+diff --git a/ares/n64/cartridge/isviewer.cpp b/ares/n64/cartridge/isviewer.cpp
+index 4f16eb3..5680454 100644
+--- a/ares/n64/cartridge/isviewer.cpp
++++ b/ares/n64/cartridge/isviewer.cpp
+@@ -1,3 +1,5 @@
++#include <cstdio>
++#include <cstdlib>
+ auto Cartridge::ISViewer::readHalf(u32 address) -> u16 {
+   address = (address & 0xffff);
+   return ram.read<Half>(address);
+@@ -9,6 +11,12 @@ auto Cartridge::ISViewer::readWord(u32 address) -> u32 {
+ }
+ 
+ auto Cartridge::ISViewer::messageChar(char c) -> void {
++  // NetPak64 debug: env-gated mirror of ISViewer/osSyncPrintf output to stdout,
++  // so headless runs get a readable printf channel (ARES_ISV=1). Independent of
++  // the debugger tracer, which only the GUI enables.
++  static int isv = -1;
++  if(isv < 0) { const char* e = getenv("ARES_ISV"); isv = (e && e[0] == '1') ? 1 : 0; }
++  if(isv) { fputc(c, stdout); if(c == '\n') fflush(stdout); }
+   if(!tracer->enabled()) return;
+   tracer->notify(c);
+ }
+diff --git a/ares/n64/netpak/io.cpp b/ares/n64/netpak/io.cpp
+index 24a05f2..366d32d 100644
+--- a/ares/n64/netpak/io.cpp
++++ b/ares/n64/netpak/io.cpp
+@@ -18,6 +18,16 @@ auto NetPak::readHalf(u32 address) -> u16 {
+ 
+ auto NetPak::readWord(u32 address) -> u32 {
+   const u32 offset = address - 0x05f0'0000;
++  // NetPak64: expose the launch room code (NP64_ROOM) at 0x0064/0x0068 (8 bytes,
++  // big-endian) so the ROM can pre-fill the join code — no manual entry needed.
++  if(offset == 0x0064 || offset == 0x0068) {
++    const auto& r = _netConfig.room; u32 base = offset - 0x0064, v = 0;
++    for(u32 i = 0; i < 4; i++) {
++      char c = (base + i < r.size()) ? r[base + i] : 0;
++      v |= (u32)(unsigned char)c << ((3 - i) * 8);
++    }
++    return v;
++  }
+   const u32 v = _core.readWord(offset);
+   //NP64_TRACE_IO=1: register-level access trace (offsets < 0x100 only, so
+   //buffer-window DMA doesn't flood), emulator-side = zero ROM timing impact.
+diff --git a/ares/n64/netpak/netpak.cpp b/ares/n64/netpak/netpak.cpp
+index 8d468d9..073cc16 100644
+--- a/ares/n64/netpak/netpak.cpp
++++ b/ares/n64/netpak/netpak.cpp
+@@ -39,7 +39,7 @@ auto NetPak::load(Node::Object parent) -> void {
+   _testSavestate = t && *t && *t != '0';
+   const char* ti = std::getenv("NP64_TRACE_IO");
+   _traceIo = ti && *ti && *ti != '0';
+-  _traceBudget = _traceIo ? 4000 : 0;
++  _traceBudget = _traceIo ? 4000000 : 0;
+   _loggedMagicRead = false;
+   _tickCount = 0;
+   _testState.clear();

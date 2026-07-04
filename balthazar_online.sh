@@ -1,0 +1,83 @@
+#!/bin/bash
+# Native ONLINE two-player test for balthazar (macOS ares, netpak fork).
+#
+# Boots TWO ares windows that talk to the relay running on melchior. Nothing is
+# auto-driven: YOU drive the menus. One window HOSTs, the other JOINs by code.
+#
+# Usage:   bash balthazar_online.sh
+#   env overrides: MELCHIOR=<ip>  ROM=<path>  ARES=<path>  RELAYPORT=6464
+set -u
+
+MELCHIOR="${MELCHIOR:-100.96.183.93}"      # melchior over Tailscale (or 192.168.1.154 on LAN)
+RELAYPORT="${RELAYPORT:-6464}"
+ROM="${ROM:-$HOME/mk64_net.z64}"
+CODE="${CODE:-}"                           # shared 6-char room code; both windows pre-fill it
+                                           # (empty = old behavior: HOST creates a random code)
+
+echo "== pulling human-drivable ROM from melchior (expect md5 dd6f46a4...) =="
+scp "jsuppe@${MELCHIOR}:/home/jsuppe/dev/mk64/build/us/mk64.us.z64" "$ROM" || {
+  echo "scp failed. Set MELCHIOR=<ip> or copy the ROM to $ROM manually."; exit 1; }
+md5 "$ROM" 2>/dev/null || md5sum "$ROM" 2>/dev/null
+
+echo "== locating ares (netpak fork) =="
+ARES="${ARES:-}"
+if [ -z "$ARES" ]; then
+  # known build location first, then a deeper search (the binary is ~7 dirs down)
+  ARES="$HOME/dev/ares/build_macos/desktop-ui/RelWithDebInfo/ares.app/Contents/MacOS/ares"
+  [ -f "$ARES" ] || ARES="$(find "$HOME/dev/ares" -maxdepth 9 -type f -name ares -path '*.app/Contents/MacOS/*' 2>/dev/null | head -1)"
+fi
+echo "  ares : $ARES"
+[ -f "$ARES" ] || { echo "ares binary not found — set ARES=/full/path/to/ares.app/Contents/MacOS/ares"; exit 1; }
+
+echo "== using melchior's relay at ${MELCHIOR}:${RELAYPORT} (no local relay needed) =="
+
+launch() {  # $1=name  $2=home
+  mkdir -p "$2"
+  # NP64_ROOM=CODE pre-fills the in-game join code (both windows share it); empty
+  # leaves the menu to create/enter a code manually.
+  HOME="$2" NP64_ENABLE=1 NP64_LOG=1 \
+    NP64_RELAY="${MELCHIOR}:${RELAYPORT}" NP64_ROOM="$CODE" NP64_NAME="$1" \
+    "$ARES" --system "Nintendo 64" "$ROM" >"/tmp/ares_$1.log" 2>&1 &
+  echo $!
+}
+
+[ -n "$CODE" ] && echo "== shared room code: $CODE (pre-filled in both windows) =="
+
+echo "== launching two ares windows (host=alice, join=bob) =="
+A=$(launch alice /tmp/np64_home_alice)
+sleep 3
+B=$(launch bob   /tmp/np64_home_bob)
+
+cat <<EOF
+
+Two ares windows are open. If keyboard input isn't mapped, set it once per
+window in  Settings > Inputs > Nintendo 64 > Controller Port 1  (D-Pad, A, B,
+Start, L, R). Then:
+
+  WINDOW 1 (alice) = HOST
+    Title: press Start/A to enter the menus
+    Main menu: go to MODE SELECT, choose ONLINE
+    ONLINE screen: HOST GAME (A)  ->  the ROOM CODE (shared code if CODE= was set)
+    In the lobby: L / R to pick the COURSE, then press START to begin
+
+  WINDOW 2 (bob) = JOIN
+    Same path to the ONLINE screen, choose JOIN GAME (A)
+    - With CODE= set: it joins straight away (code pre-filled, no typing)
+    - Without CODE=:  Up/Down change a letter, Left/Right move; dial in alice's
+                      ROOM CODE, then A to join
+    You'll see the lobby with "WAITING FOR HOST"
+
+  When alice presses START, BOTH pick a character, then both drop into
+  alice's chosen course and drive together — you should see each other's kart.
+
+  TIP: run with a shared code so neither window types anything:
+       CODE=RACE23 bash balthazar_online.sh
+
+Per-instance logs:  /tmp/ares_alice.log   /tmp/ares_bob.log
+  (look for "relay=${MELCHIOR}:${RELAYPORT}" and "LINK" / "room" lines)
+
+PIDs: alice=$A bob=$B   (kill both: kill $A $B)
+
+If the windows can't reach the relay, check UDP ${RELAYPORT} to ${MELCHIOR} is
+open over Tailscale, or re-run with the LAN ip:  MELCHIOR=192.168.1.154 bash balthazar_online.sh
+EOF

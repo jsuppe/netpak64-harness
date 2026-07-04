@@ -1,0 +1,10 @@
+# Whitelist: only harness scripts, decoders, and patches are tracked.
+# Everything else here is environment/artifacts: ares/aresroot/ccache build
+# trees, relay-target binaries, np64out logs+screenshots, campaign outputs —
+# and ROMs (*.z64), which contain Nintendo assets and must NEVER be committed.
+*
+!/*.sh
+!/*.py
+!/ares_netpak.patch
+!/.gitignore
+!/README.md
