@@ -15,7 +15,7 @@ CODE="${CODE:-}"                           # shared 6-char room code; both windo
                                            # (empty = old behavior: HOST creates a random code)
 WINDOWS="${WINDOWS:-2}"                    # 1 = just the host window (racing melchior bots)
 
-echo "== pulling HUMAN LOCKSTEP ROM from melchior (expect md5 229cb90e...) =="
+echo "== pulling HUMAN LOCKSTEP ROM from melchior (expect md5 4ecfb26a...) =="
 scp "jsuppe@${MELCHIOR}:/mnt/micron/jsuppe/netpak/mk64_netpak_human.z64" "$ROM" || {
   echo "scp failed. Set MELCHIOR=<ip> or copy the ROM to $ROM manually."; exit 1; }
 md5 "$ROM" 2>/dev/null || md5sum "$ROM" 2>/dev/null
@@ -32,12 +32,15 @@ echo "  ares : $ARES"
 
 echo "== using melchior's relay at ${MELCHIOR}:${RELAYPORT} (no local relay needed) =="
 
-launch() {  # $1=name  $2=home
+launch() {  # $1=label (log name)  $2=home
   mkdir -p "$2"
   # NP64_ROOM=CODE pre-fills the in-game join code (both windows share it); empty
   # leaves the menu to create/enter a code manually.
+  # NP64_NAME is deliberately NOT set: the name you pick in-game (ONLINE ->
+  # NAME) persists per-window in $2/.netpak64_name and is used from then on.
+  # First run defaults to "player" — set your name once in the menu.
   HOME="$2" NP64_ENABLE=1 NP64_LOG=1 \
-    NP64_RELAY="${MELCHIOR}:${RELAYPORT}" NP64_ROOM="$CODE" NP64_NAME="$1" \
+    NP64_RELAY="${MELCHIOR}:${RELAYPORT}" NP64_ROOM="$CODE" \
     "$ARES" --system "Nintendo 64" "$ROM" >"/tmp/ares_$1.log" 2>&1 &
   echo $!
 }

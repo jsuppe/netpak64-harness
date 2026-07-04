@@ -3,11 +3,21 @@
 ## What this is
 First build where HUMANS play the lockstep online engine (one shared
 deterministic simulation; all prior testing was robot-driven).
-ROM: `mk64_netpak_human.z64` (md5 b542d616) — lockstep ON, all test
+ROM: `mk64_netpak_human.z64` (md5 4ecfb26a) — lockstep ON, all test
 automation OFF, real host/join flow.
 
+## New: set your player name in-game
+ONLINE -> NAME opens a letter editor (stick up/down cycles letters,
+left/right moves, A saves, B cancels). The name shows in every lobby
+roster, updates live for players already in the room, and persists per
+window (`$HOME/.netpak64_name`, so alice/bob windows each keep their own).
+The launcher no longer passes NP64_NAME — first boot shows "player" until
+you set a name once.
+
 ## One-time: update ares on balthazar
-The ROM needs the CURRENT NetPak64 device (room-code register + fixes).
+The ROM needs the CURRENT NetPak64 device (name registers + SETNAME relay
+forwarding — an older ares will save the name locally but nobody else
+will see it).
 On balthazar:
     cd ~/dev/ares
     git remote add private https://github.com/jsuppe/ares-netpak64.git  # once
