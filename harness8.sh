@@ -33,6 +33,14 @@ EVSHOTS=0
 LASTSHOT=0
 for i in $(seq 1 "${DWELL:-110}"); do
   sleep 1
+  # Leaver test: kill one instance mid-race (KILL_NAME=carol KILL_AT=60)
+  if [ -n "${KILL_NAME:-}" ] && [ "$i" = "${KILL_AT:-60}" ]; then
+    idx=0
+    for n in "${NAMES[@]}"; do
+      if [ "$n" = "$KILL_NAME" ]; then kill -9 "${PIDS[$idx]}" 2>/dev/null; echo "KILLED $KILL_NAME (node $idx) at t=${i}s"; fi
+      idx=$((idx+1))
+    done
+  fi
   for WID in $(xdotool search --name mk64 2>/dev/null | sort -u); do
     xdotool windowactivate "$WID" 2>/dev/null; xdotool key --window "$WID" Return 2>/dev/null
   done
@@ -88,3 +96,14 @@ for n in "${NAMES[@]}"; do
   echo "$n: 0x77=$(grep -c 'io wW 0020 <- 77' "$OUT/$n.log")  stalls=$(grep -oE 'io wW 0020 <- 68[0-9a-fA-F]{6}' "$OUT/$n.log" | tail -1 | grep -oE '[0-9a-f]{6}$')"
 done
 python3 /work/decode_det4.py "${LOGS[@]}"
+if [ -n "${KILL_NAME:-}" ]; then
+  echo "===== SURVIVORS-ONLY comparison (post-drop determinism) ====="
+  SLOGS=()
+  for n in "${NAMES[@]}"; do [ "$n" = "$KILL_NAME" ] || SLOGS+=("$OUT/$n.log"); done
+  python3 /work/decode_det4.py "${SLOGS[@]}"
+  echo "===== drop events (0x58 [player<<16|lastFrame]) ====="
+  for n in "${NAMES[@]}"; do
+    [ "$n" = "$KILL_NAME" ] && continue
+    echo "$n: $(grep -oiE '0020 <- 58[0-9a-f]{6}' "$OUT/$n.log" | sort -u | head -2 | tr '\n' ' ')"
+  done
+fi

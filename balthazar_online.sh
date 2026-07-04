@@ -14,8 +14,8 @@ ROM="${ROM:-$HOME/mk64_net.z64}"
 CODE="${CODE:-}"                           # shared 6-char room code; both windows pre-fill it
                                            # (empty = old behavior: HOST creates a random code)
 
-echo "== pulling human-drivable ROM from melchior (expect md5 dd6f46a4...) =="
-scp "jsuppe@${MELCHIOR}:/home/jsuppe/dev/mk64/build/us/mk64.us.z64" "$ROM" || {
+echo "== pulling HUMAN LOCKSTEP ROM from melchior (expect md5 b542d616...) =="
+scp "jsuppe@${MELCHIOR}:/mnt/micron/jsuppe/netpak/mk64_netpak_human.z64" "$ROM" || {
   echo "scp failed. Set MELCHIOR=<ip> or copy the ROM to $ROM manually."; exit 1; }
 md5 "$ROM" 2>/dev/null || md5sum "$ROM" 2>/dev/null
 
@@ -67,8 +67,18 @@ Start, L, R). Then:
                       ROOM CODE, then A to join
     You'll see the lobby with "WAITING FOR HOST"
 
-  When alice presses START, BOTH pick a character, then both drop into
-  alice's chosen course and drive together — you should see each other's kart.
+  When alice presses START, BOTH pick a character; the map screen shows
+  "WAITING FOR ALL PLAYERS" until everyone is in, then the race starts in
+  LOCKSTEP: one shared simulation — same items, same collisions, same
+  standings on both screens.
+
+  LOCKSTEP NOTES (new engine):
+   - If a window briefly FREEZES, it is waiting for the other player's input
+     (network hiccup) — it resumes by itself.
+   - If a player quits/crashes mid-race, after ~5s their kart becomes a CPU
+     bot and the race continues. This includes the HOST.
+   - If the host quits before the race starts, joiners return to the online
+     menu after ~3s.
 
   TIP: run with a shared code so neither window types anything:
        CODE=RACE23 bash balthazar_online.sh
