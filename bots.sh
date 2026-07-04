@@ -34,7 +34,7 @@ sleep 2
 
 docker exec -e CODE="$CODE" -e BOTS="$BOTS" -e RELAY="$RELAY" -e DWELL="$DWELL" npbots bash -c '
 export DISPLAY=:78
-pkill -9 -f "Xvfb :78" 2>/dev/null; rm -f /tmp/.X78-lock /tmp/.X11-unix/X78
+pkill -9 -x Xvfb 2>/dev/null; rm -f /tmp/.X78-lock /tmp/.X11-unix/X78
 Xvfb :78 -screen 0 1280x720x24 >/tmp/xvfb.log 2>&1 & sleep 2
 openbox >/tmp/ob.log 2>&1 & sleep 1
 ARESBIN=/src/build/desktop-ui/ares
