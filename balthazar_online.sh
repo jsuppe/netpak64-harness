@@ -15,6 +15,12 @@ CODE="${CODE:-}"                           # shared 6-char room code; both windo
                                            # (empty = old behavior: HOST creates a random code)
 WINDOWS="${WINDOWS:-2}"                    # 1 = just the host window (racing melchior bots)
 
+# Ghost cleanup: windows from previous runs stay CONNECTED in the same room,
+# eat the 8 seats, and wedge the start handshake (the relay only reaps them
+# ~30s after they die). Kill any earlier instances before launching new ones.
+echo "== closing game windows from previous runs =="
+pkill -f "mk64_net.z64" 2>/dev/null && sleep 2 || true
+
 echo "== pulling HUMAN LOCKSTEP ROM from melchior (expect md5 5f5f9dbf...) =="
 scp "jsuppe@${MELCHIOR}:/mnt/micron/jsuppe/netpak/mk64_netpak_human.z64" "$ROM" || {
   echo "scp failed. Set MELCHIOR=<ip> or copy the ROM to $ROM manually."; exit 1; }
