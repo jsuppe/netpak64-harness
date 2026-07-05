@@ -15,7 +15,7 @@ CODE="${CODE:-}"                           # shared 6-char room code; both windo
                                            # (empty = old behavior: HOST creates a random code)
 WINDOWS="${WINDOWS:-2}"                    # 1 = just the host window (racing melchior bots)
 
-echo "== pulling HUMAN LOCKSTEP ROM from melchior (expect md5 332cedf8...) =="
+echo "== pulling HUMAN LOCKSTEP ROM from melchior (expect md5 a1ea1cec...) =="
 scp "jsuppe@${MELCHIOR}:/mnt/micron/jsuppe/netpak/mk64_netpak_human.z64" "$ROM" || {
   echo "scp failed. Set MELCHIOR=<ip> or copy the ROM to $ROM manually."; exit 1; }
 md5 "$ROM" 2>/dev/null || md5sum "$ROM" 2>/dev/null
@@ -69,11 +69,11 @@ Start, L, R). Then:
 
   WINDOW 2 (bob) = JOIN
     Same path to the ONLINE screen, choose JOIN GAME (A)
-    The code-entry screen always appears (v4): with CODE= set it is pre-filled
-    (just press A); otherwise Up/Down change a letter, Left/Right move, then A.
-    Nobody is in the lobby until they confirm a code here — booting a window
-    no longer joins anything.
-    You'll see the lobby with "WAITING FOR HOST"
+    The code-entry screen always appears: with CODE= set it is pre-filled
+    (just press A); otherwise dial the code and press A.
+    NEW in v9: whoever confirms a fresh code FIRST becomes the HOST (course
+    picker + START) — so with CODE= set you can simply pick JOIN in both
+    windows; the first one gets the host lobby, the second waits as a guest.
 
   When alice presses START, BOTH pick a character; the map screen shows
   "WAITING FOR ALL PLAYERS" until everyone is in, then the race starts in
