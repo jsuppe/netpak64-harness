@@ -3,7 +3,7 @@
 ## What this is
 First build where HUMANS play the lockstep online engine (one shared
 deterministic simulation; all prior testing was robot-driven).
-ROM: `mk64_netpak_human.z64` (md5 510af785, JSUPPE VERSION 11 on the title screen) — lockstep ON, all test
+ROM: `mk64_netpak_human.z64` (md5 5f5f9dbf, JSUPPE VERSION 12 on the title screen) — lockstep ON, all test
 automation OFF, real host/join flow.
 
 ## New: set your player name in-game
