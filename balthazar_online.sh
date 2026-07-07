@@ -21,7 +21,7 @@ WINDOWS="${WINDOWS:-2}"                    # 1 = just the host window (racing me
 echo "== closing game windows from previous runs =="
 pkill -f "mk64_net.z64" 2>/dev/null && sleep 2 || true
 
-echo "== pulling HUMAN LOCKSTEP ROM from melchior (expect md5 5f5f9dbf...) =="
+echo "== pulling HUMAN LOCKSTEP ROM from melchior (expect md5 7dac0f6a...) =="
 scp "jsuppe@${MELCHIOR}:/mnt/micron/jsuppe/netpak/mk64_netpak_human.z64" "$ROM" || {
   echo "scp failed. Set MELCHIOR=<ip> or copy the ROM to $ROM manually."; exit 1; }
 md5 "$ROM" 2>/dev/null || md5sum "$ROM" 2>/dev/null
@@ -45,7 +45,7 @@ launch() {  # $1=label (log name)  $2=home
   # NP64_NAME is deliberately NOT set: the name you pick in-game (ONLINE ->
   # NAME) persists per-window in $2/.netpak64_name and is used from then on.
   # First run defaults to "player" — set your name once in the menu.
-  HOME="$2" NP64_ENABLE=1 NP64_LOG=1 \
+  HOME="$2" NP64_ENABLE=1 NP64_LOG=1 NP64_TRACE_IO=1 \
     NP64_RELAY="${MELCHIOR}:${RELAYPORT}" NP64_ROOM="$CODE" \
     "$ARES" --system "Nintendo 64" "$ROM" >"/tmp/ares_$1.log" 2>&1 &
   echo $!
@@ -71,7 +71,10 @@ Start, L, R). Then:
     Title: press Start/A to enter the menus
     Main menu: go to MODE SELECT, choose ONLINE
     ONLINE screen: HOST GAME (A)  ->  the ROOM CODE (shared code if CODE= was set)
-    In the lobby: L / R to pick the COURSE, then press START to begin
+    Pick the CLASS (50/100/150cc) on the GAME SELECT screen when choosing
+    ONLINE. In the lobby just press START; after character select the HOST
+    picks the track on the REAL course-select screen (cup, then course)
+    while joiners watch locked until the pick lands.
 
   WINDOW 2 (bob) = JOIN
     Same path to the ONLINE screen, choose JOIN GAME (A)
@@ -86,6 +89,15 @@ Start, L, R). Then:
   LOCKSTEP: one shared simulation — same items, same collisions, same
   standings on both screens.
 
+  INDICATORS (v39):
+   - Online screens show the RELAY status line (CONNECTING / CONNECTED /
+     IN ROOM) under the ONLINE title.
+   - In-race YELLOW pulsing square (top-left) = waiting on a peer's
+     connection; do NOT quit — an unresponsive player is auto-removed
+     within ~15s and the race continues.
+   - In-race RED flashing square = the simulations have split (desync);
+     please report when you see it appear.
+
   LOCKSTEP NOTES (new engine):
    - If a window briefly FREEZES, it is waiting for the other player's input
      (network hiccup) — it resumes by itself.
@@ -93,9 +105,26 @@ Start, L, R). Then:
      bot and the race continues. This includes the HOST.
    - If the host quits before the race starts, joiners return to the online
      menu after ~3s.
+   - NEW in v20: item boxes give ITEMS to every player (up to 4), and the
+     pause menu works on both consoles (each player navigates with their
+     own controller; both press START to resume).
+   - NEW in v33: the lobby shows each player's PING next to their name
+     (green <60ms / yellow <120ms / red beyond) — measured through the
+     relay, so it is the real player-to-player round trip.
+   - NEW in v21: UNPAUSE is networked too — ONE player pressing START
+     resumes the race on every screen. A player who left the lobby no
+     longer freezes the race start (their seat becomes a CPU).
+   - NEW in v13: PAUSE is networked. Pressing START freezes the race on
+     EVERY screen (like split-screen); the other players wait until you
+     unpause. Pausing no longer desyncs the race (no more red square).
 
   TIP: run with a shared code so neither window types anything:
        CODE=RACE23 bash balthazar_online.sh
+
+AFTER PLAYING — send the diagnostic logs back (v15 records render/camera
+forensics into them; this is how the joiner ghosting bug gets solved):
+
+    scp /tmp/ares_alice.log /tmp/ares_bob.log jsuppe@${MELCHIOR}:/mnt/micron/jsuppe/netpak/fieldlogs/
 
 Per-instance logs:  /tmp/ares_alice.log   /tmp/ares_bob.log
   (look for "relay=${MELCHIOR}:${RELAYPORT}" and "LINK" / "room" lines)
