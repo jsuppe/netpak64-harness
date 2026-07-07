@@ -3,8 +3,14 @@
 ## What this is
 First build where HUMANS play the lockstep online engine (one shared
 deterministic simulation; all prior testing was robot-driven).
-ROM: `mk64_netpak_human.z64` (md5 7dac0f6a, JSUPPE VERSION 41 on the title screen) — lockstep ON, all test
+ROM: `mk64_netpak_human.z64` (md5 4b99dbcd, JSUPPE VERSION 42 on the title screen) — lockstep ON, all test
 automation OFF, real host/join flow.
+
+## New in VERSION 42
+- **Joiner camera altitude fixed**: v41's camera isolation accidentally froze
+  the joiner's camera tuning at intro-flyover values — the "flying like
+  lakitu" view. The joiner camera now rides at normal chase height and still
+  keeps its own steering/banking state (the v41 fix, done right this time).
 
 ## New in VERSION 41
 - **Joiner camera fixed**: the joiner's chase camera had been re-seeded every

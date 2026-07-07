@@ -21,7 +21,7 @@ WINDOWS="${WINDOWS:-2}"                    # 1 = just the host window (racing me
 echo "== closing game windows from previous runs =="
 pkill -f "mk64_net.z64" 2>/dev/null && sleep 2 || true
 
-echo "== pulling HUMAN LOCKSTEP ROM from melchior (expect md5 7dac0f6a...) =="
+echo "== pulling HUMAN LOCKSTEP ROM from melchior (expect md5 4b99dbcd...) =="
 scp "jsuppe@${MELCHIOR}:/mnt/micron/jsuppe/netpak/mk64_netpak_human.z64" "$ROM" || {
   echo "scp failed. Set MELCHIOR=<ip> or copy the ROM to $ROM manually."; exit 1; }
 md5 "$ROM" 2>/dev/null || md5sum "$ROM" 2>/dev/null
