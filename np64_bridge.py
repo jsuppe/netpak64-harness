@@ -146,6 +146,7 @@ class SC64:
 FT_HELLO, FT_WELCOME, FT_CREATE, FT_JOIN, FT_JOINED = 0x00, 0x01, 0x02, 0x03, 0x04
 FT_PEER_JOIN, FT_PEER_LEAVE, FT_DATA, FT_PING, FT_PONG = 0x05, 0x06, 0x07, 0x08, 0x09
 FT_TIME, FT_LEAVE, FT_KEEPALIVE, FT_ERROR, FT_SETNAME = 0x0A, 0x0B, 0x0D, 0x0E, 0x0F
+FT_LIST = 0x10
 
 class Relay:
     def __init__(self, addr=RELAY_ADDR):
@@ -243,7 +244,7 @@ def relay_hello_with_token(addr):
 NPU_DATATYPE = 0x40
 
 OP_NOP, OP_SET_IDENTITY, OP_CREATE, OP_JOIN, OP_LEAVE = 0, 1, 2, 3, 4
-OP_LIST_PEERS, OP_PING, OP_GET_TIME = 5, 6, 7
+OP_LIST_PEERS, OP_PING, OP_GET_TIME, OP_LIST_GAMES = 5, 6, 7, 9
 
 CMD_OK, CMD_ERR = 0x02, 0x03
 ERR_INVAL, ERR_NOTJOINED, ERR_TIMEOUT, ERR_RELAY = 1, 3, 6, 8
@@ -378,7 +379,8 @@ class Bridge:
                             seq=self._next_seq())
             self.send_welcome()  # refresh the 0x6C name registers
         elif opcode == OP_CREATE:
-            self.start_ctl(opcode, FT_CREATE)
+            flags = body[3] & 1 if len(body) >= 4 else 0  # ARG0 low byte bit0 = PUBLIC
+            self.start_ctl(opcode, FT_CREATE, bytes([flags]))
         elif opcode == OP_JOIN:
             self.start_ctl(opcode, FT_JOIN, cd[:6])
         elif opcode == OP_LEAVE:
@@ -398,6 +400,8 @@ class Bridge:
             self.send_cmdres(CMD_OK, res0=self.rtt_us)
         elif opcode == OP_GET_TIME:
             self.start_ctl(opcode, FT_TIME)
+        elif opcode == OP_LIST_GAMES:
+            self.start_ctl(opcode, FT_LIST)
         else:
             self.send_cmdres(CMD_ERR, err=ERR_INVAL)
 
@@ -432,6 +436,17 @@ class Bridge:
                 hi, lo = struct.unpack(">II", payload[:8])
                 self.pending = None
                 self.send_cmdres(CMD_OK, res0=hi, res1=lo)
+        elif ftype == FT_LIST:
+            if self.pending and self.pending[0] == OP_LIST_GAMES and payload:
+                count = payload[0]
+                data = b""
+                for i in range(count):
+                    e = payload[1 + i * 23:1 + (i + 1) * 23]
+                    if len(e) < 23:
+                        break
+                    data += e[:6] + b"\x00\x00" + bytes([e[6]]) + b"\x00" * 3 + e[7:23]
+                self.pending = None
+                self.send_cmdres(CMD_OK, res0=count, data=data)
         elif ftype == FT_PONG:
             if self.ping_seq and ack == self.ping_seq:
                 self.rtt_us = int((time.time() - self.ping_sent) * 1e6)

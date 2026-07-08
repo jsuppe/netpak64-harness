@@ -171,6 +171,34 @@ def main():
     check(len(w) == 1 and w[0][2][16:32].rstrip(b"\x00") == b"jonracer",
           "fresh 'W' carries the new name")
 
+    print("== FIND GAME: public room is listed, private is not ==")
+    # current room was created PRIVATE (arg0=0) -> LIST must NOT show it
+    sc.inject(nb.npu_frame(ord("C"), nb.OP_LIST_GAMES, body))
+    pump(br, sc, 1.0)
+    r = take(sc, "R")
+    ok = len(r) == 1 and r[0][1] == nb.CMD_OK
+    check(ok, "'R' OK for LIST_GAMES (private era)")
+    if ok:
+        count = struct.unpack(">I", r[0][2][4:8])[0]
+        check(count == 0, f"private room not listed (count={count})")
+    # re-create PUBLIC (ARG0 bit0) -> LIST must show it with our host name
+    pubbody = b"\x00\x00\x00\x01" + b"\x00" * 16
+    sc.inject(nb.npu_frame(ord("C"), nb.OP_CREATE, pubbody))
+    pump(br, sc, 1.0)
+    r = take(sc, "R")
+    check(len(r) >= 1 and r[0][1] == nb.CMD_OK, "'R' OK for PUBLIC create")
+    sc.inject(nb.npu_frame(ord("C"), nb.OP_LIST_GAMES, body))
+    pump(br, sc, 1.0)
+    r = take(sc, "R")
+    ok = len(r) == 1 and r[0][1] == nb.CMD_OK
+    check(ok, "'R' OK for LIST_GAMES (public era)")
+    if ok:
+        count = struct.unpack(">I", r[0][2][4:8])[0]
+        e = r[0][2][12:40]  # 28B entry: code8, players, pad3, host16
+        host = e[12:28].rstrip(b"\x00")
+        check(count == 1 and e[8] == 1 and host == b"jonracer",
+              f"listed: count={count} players={e[8] if len(e)>8 else '?'} host={host!r}")
+
     print("== SESSION_LEAVE ==")
     sc.inject(nb.npu_frame(ord("C"), nb.OP_LEAVE, body))
     pump(br, sc, 1.0)
