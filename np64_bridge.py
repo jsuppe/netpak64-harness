@@ -97,9 +97,13 @@ class SC64:
 
     def _fill(self, need, deadline):
         while len(self.buf) < need:
+            # Clamp to a zero-timeout select rather than bailing when the
+            # deadline has passed: timeout=0 polls must still consume data
+            # already buffered by the OS (the v45 "bridge went deaf" bug —
+            # poll_pkts(0.0) returned before ever reading the console's HELLO).
             wait = deadline - time.time()
-            if wait <= 0:
-                return False
+            if wait < 0:
+                wait = 0.0
             r, _, _ = select.select([self.fd], [], [], wait)
             if not r:
                 return False
@@ -268,6 +272,7 @@ class Bridge:
         self.last_ping = 0.0
         self.last_status = 0.0
         self.tx_n64 = self.rx_n64 = 0
+        self.console_up = False  # set on the first 'H'; gates periodic 'S'
 
     # -- relay side ----------------------------------------------------------
     def _next_seq(self):
@@ -453,6 +458,7 @@ class Bridge:
             off += 4 + ln
             if op == ord("H"):
                 print(f"[bridge] N64 HELLO (proto {a})")
+                self.console_up = True
                 self.send_welcome()
                 self.send_status()
             elif op == ord("C"):
@@ -476,8 +482,12 @@ class Bridge:
         print("[bridge] waiting for console (power on the N64 now)")
         last_report = time.time()
         while True:
+            # Wake the instant EITHER side has data (was a 20 ms serial-poll
+            # tick, which put up to 20 ms of pure loop latency on every
+            # relay->console packet and inflated the measured RTT to match).
+            select.select([self.sc.fd, self.relay.sock], [], [], 0.005)
             # serial: async PKTs from the cart
-            for fid, payload in self.sc.poll_pkts(0.02):
+            for fid, payload in self.sc.poll_pkts(0.0):
                 if fid == b"U" and len(payload) >= 4:
                     (hdr,) = struct.unpack(">I", payload[:4])
                     dt, ln = hdr >> 24, hdr & 0xFFFFFF
@@ -506,8 +516,8 @@ class Bridge:
                 self.ping_sent = now
                 self.last_ping = now
                 self.relay.send(FT_PING, seq=self.ping_seq)
-            # periodic status to the ROM
-            if now - self.last_status >= 1.0:
+            # periodic status to the ROM (only once a console has said hello)
+            if self.console_up and now - self.last_status >= 1.0:
                 self.send_status()
             if now - last_report >= 30.0:
                 last_report = now
