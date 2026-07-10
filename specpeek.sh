@@ -9,7 +9,7 @@ Xvfb :$DN -screen 0 1000x800x24 >/dev/null 2>&1 &
 sleep 3
 rm -rf /tmp/spec; mkdir -p /tmp/spec
 HOME=/tmp/spec ARES_ISV=1 NP64_ENABLE=1 NP64_LOG=1 \
-  NP64_RELAY=127.0.0.1:6465 NP64_ROOM=SQ$(printf %04d $(($$ % 10000))) NP64_NAME=alice \
+  NP64_RELAY=127.0.0.1:6465 NP64_ROOM=SQ$(date +%s | tail -c 5) NP64_NAME=alice \
   /src/build/desktop-ui/ares --no-file-prompt --setting Input/Defocus=Allow \
   --setting Audio/Driver=None --setting Input/Driver=None \
   --setting DebugServer/Enabled=true --setting DebugServer/Port=9168 \

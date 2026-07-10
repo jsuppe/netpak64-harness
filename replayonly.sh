@@ -11,7 +11,7 @@ Xvfb :$DN -screen 0 1400x620x24 >/dev/null 2>&1 &
 sleep 3
 rm -rf /tmp/rt_rep; mkdir -p /tmp/rt_rep
 HOME=/tmp/rt_rep ARES_ISV=1 NP64_ENABLE=1 NP64_LOG=1 \
-  NP64_RELAY=127.0.0.1:6465 NP64_ROOM=RP$(printf %04d $(($$ % 10000))) NP64_NAME=alice \
+  NP64_RELAY=127.0.0.1:6465 NP64_ROOM=RP$(date +%s | tail -c 5) NP64_NAME=alice \
   /src/build/desktop-ui/ares --no-file-prompt --setting Input/Defocus=Allow \
   --setting Audio/Driver=None --setting Input/Driver=None --setting Video/Driver=None \
   --setting DebugServer/Enabled=true --setting DebugServer/Port=9167 \
