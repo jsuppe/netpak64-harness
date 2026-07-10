@@ -268,6 +268,7 @@ class Bridge:
         self.rtt_us = 0
         self.seq = 1
         self.pending = None      # (opcode, ftype_wanted, relay_ftype, payload, seq, deadline, next_resend)
+        self.rt_df = {}          # race telemetry: side -> [t0, df0, tN, dfN]
         self.ping_seq = 0
         self.ping_sent = 0.0
         self.last_ping = 0.0
@@ -323,7 +324,9 @@ class Bridge:
         if payload:
             self.node_id = payload[0]
         self.link = True
-        self.session = True   # relay HELLO always lands in a room (spec §8.4)
+        # A room-code HELLO lands in that room (spec §8.4); a no-room HELLO
+        # just connects (relay ee0ecb1) and answers WELCOME with node 0xFF.
+        self.session = self.node_id != 0xFF
         self.epoch += 1
         self.ingest_roster(payload)
 
@@ -410,6 +413,9 @@ class Bridge:
         ftype, ch, src, dst, payload, token, ack = f
         if ftype == FT_DATA:
             self.rx_n64 += 1
+            self._race_note_df(f"peer{src}", payload)  # body only: the ch byte
+                                                        # broke tag parsing (no peer
+                                                        # simrate lines ever printed)
             self.send_n64(ord("X"), src, bytes([ch]) + payload)
         elif ftype == FT_JOINED:
             if len(payload) >= 7:
@@ -465,6 +471,30 @@ class Bridge:
                 self.send_cmdres(CMD_ERR, err=ERR_RELAY)
 
     # -- inbound N64 traffic ------------------------------------------------------
+    # -- race telemetry (task: measure perceived slowdown empirically) --------
+    # LS_TAG (0x4C) input packets carry baseFrame+count = the sender's sim
+    # frame; sampling it over wall time gives the LIVE SIM RATE (60/s = full
+    # speed; lockstep stalls show up directly as a lower rate). OLMSG_START
+    # (0x53/1) carries the host-sized input delay in chars[1].
+    def _race_note_df(self, who, body):
+        if len(body) >= 6 and body[0] == 0x4C:
+            df = ((body[4] << 8) | body[5]) + body[2] - 1
+            t = time.time()
+            side = self.rt_df.setdefault(who, [t, df, t, df])  # [t0,df0,tN,dfN]
+            if df >= side[3] or side[3] - df > 30000:  # tolerate u16 wrap
+                side[2], side[3] = t, df
+        elif len(body) >= 12 and body[0] == 0x53 and body[1] == 1:
+            print(f"[race] START course={body[2]} input-delay={body[5]} frames",
+                  flush=True)
+            self.rt_df = {}
+
+    def _race_report(self):
+        for who, (t0, df0, tN, dfN) in sorted(self.rt_df.items()):
+            dt = tN - t0
+            if dt >= 3 and dfN > df0:
+                print(f"[race] simrate {who}: df={dfN} avg={(dfN - df0) / dt:.1f}/s "
+                      f"(60/s = full speed)", flush=True)
+
     def on_n64_data(self, data):
         off = 0
         while off + 4 <= len(data):
@@ -482,6 +512,7 @@ class Bridge:
                 self.tx_n64 += 1
                 if payload:
                     ch, body = payload[0], payload[1:]
+                    self._race_note_df("console", body)
                     self.relay.send(FT_DATA, body, channel=ch,
                                     src=self.node_id, dst=a)
 
@@ -539,6 +570,7 @@ class Bridge:
                 print(f"[bridge] alive: tx(N64->relay)={self.tx_n64} "
                       f"rx(relay->N64)={self.rx_n64} peers={len(self.peers)} "
                       f"rtt={self.rtt_us}us session={self.session}")
+                self._race_report()
 
 def run_bridge(args):
     sc = SC64(args.dev)
