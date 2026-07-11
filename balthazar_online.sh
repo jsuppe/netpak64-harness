@@ -5,11 +5,11 @@
 # auto-driven: YOU drive the menus. One window HOSTs, the other JOINs by code.
 #
 # Usage:   bash balthazar_online.sh
-#   env overrides: MELCHIOR=<ip>  ROM=<path>  ARES=<path>  RELAYPORT=6464
+#   env overrides: MELCHIOR=<ip>  ROM=<path>  ARES=<path>  RELAYPORT=6465
 set -u
 
 MELCHIOR="${MELCHIOR:-100.96.183.93}"      # melchior over Tailscale (or 192.168.1.154 on LAN)
-RELAYPORT="${RELAYPORT:-6464}"
+RELAYPORT="${RELAYPORT:-6465}"
 ROM="${ROM:-$HOME/mk64_net.z64}"
 CODE="${CODE:-}"                           # shared 6-char room code; both windows pre-fill it
                                            # (empty = old behavior: HOST creates a random code)
@@ -21,7 +21,7 @@ WINDOWS="${WINDOWS:-2}"                    # 1 = just the host window (racing me
 echo "== closing game windows from previous runs =="
 pkill -f "mk64_net.z64" 2>/dev/null && sleep 2 || true
 
-echo "== pulling HUMAN LOCKSTEP ROM from melchior (expect md5 4b99dbcd...) =="
+echo "== pulling HUMAN LOCKSTEP ROM from melchior (expect md5 5f5f9dbf...) =="
 scp "jsuppe@${MELCHIOR}:/mnt/micron/jsuppe/netpak/mk64_netpak_human.z64" "$ROM" || {
   echo "scp failed. Set MELCHIOR=<ip> or copy the ROM to $ROM manually."; exit 1; }
 md5 "$ROM" 2>/dev/null || md5sum "$ROM" 2>/dev/null
@@ -36,6 +36,46 @@ fi
 echo "  ares : $ARES"
 [ -f "$ARES" ] || { echo "ares binary not found — set ARES=/full/path/to/ares.app/Contents/MacOS/ares"; exit 1; }
 
+# --- ARES STALENESS CHECK (2026-07-10: the Jul-4 build silently lacked the
+# FIND GAME device commands — rooms were created private no matter what was
+# picked). Compares the netpak device sources here against melchior's
+# CANONICAL tree, and the local binary's age against the local sources.
+# Warns loudly; set SKIP_STALE_CHECK=1 to bypass, REBUILD=1 to auto-rebuild.
+echo "== ares staleness check =="
+LOCAL_HASH=$(cat "$HOME/dev/ares/thirdparty/netpak-core/src/"*.cpp \
+                 "$HOME/dev/ares/ares/n64/netpak/"*.cpp 2>/dev/null | md5 -q 2>/dev/null)
+CANON_HASH=$(ssh -o ConnectTimeout=5 -o BatchMode=yes "jsuppe@${MELCHIOR}" \
+  "docker run --rm -v /home/melchior/dev/ares:/src ares-builder:latest \
+   sh -c 'cat /src/thirdparty/netpak-core/src/*.cpp /src/ares/n64/netpak/*.cpp 2>/dev/null | md5sum' 2>/dev/null" \
+  2>/dev/null | awk '{print $1}')
+if [ -z "${SKIP_STALE_CHECK:-}" ] && [ -n "$CANON_HASH" ] && [ -n "$LOCAL_HASH" ]; then
+  if [ "$LOCAL_HASH" != "$CANON_HASH" ]; then
+    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+    echo "!! ARES SOURCE IS STALE vs melchior's canonical netpak tree  !!"
+    echo "!! Online features may silently misbehave (this exact class  !!"
+    echo "!! made FIND GAME 'broken' on Jul 10). Ask Claude to sync,   !!"
+    echo "!! or run with SKIP_STALE_CHECK=1 to play anyway.            !!"
+    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+    [ -z "${REBUILD:-}" ] && exit 1
+  else
+    echo "  netpak sources match canonical ($LOCAL_HASH)"
+  fi
+fi
+# binary older than its own sources = forgot to rebuild
+ARES_BIN_DEFAULT="$HOME/dev/ares/build_macos/desktop-ui/RelWithDebInfo/ares.app/Contents/MacOS/ares"
+if [ -f "$ARES_BIN_DEFAULT" ]; then
+  NEWEST_SRC=$(find "$HOME/dev/ares/thirdparty/netpak-core/src" "$HOME/dev/ares/ares/n64/netpak" \
+               -name '*.cpp' -newer "$ARES_BIN_DEFAULT" 2>/dev/null | head -1)
+  if [ -n "$NEWEST_SRC" ] || [ -n "${REBUILD:-}" ]; then
+    [ -n "$NEWEST_SRC" ] && echo "  BINARY OLDER THAN SOURCE ($NEWEST_SRC) — rebuilding..."
+    /opt/homebrew/bin/cmake --build "$HOME/dev/ares/build_macos" --config RelWithDebInfo -j8 \
+      || { echo "rebuild FAILED — see output above"; exit 1; }
+    echo "  rebuild done"
+  else
+    echo "  binary up to date ($(stat -f '%Sm' "$ARES_BIN_DEFAULT"))"
+  fi
+fi
+
 echo "== using melchior's relay at ${MELCHIOR}:${RELAYPORT} (no local relay needed) =="
 
 launch() {  # $1=label (log name)  $2=home
@@ -45,7 +85,7 @@ launch() {  # $1=label (log name)  $2=home
   # NP64_NAME is deliberately NOT set: the name you pick in-game (ONLINE ->
   # NAME) persists per-window in $2/.netpak64_name and is used from then on.
   # First run defaults to "player" — set your name once in the menu.
-  HOME="$2" NP64_ENABLE=1 NP64_LOG=1 NP64_TRACE_IO=1 \
+  HOME="$2" NP64_ENABLE=1 NP64_LOG=1 \
     NP64_RELAY="${MELCHIOR}:${RELAYPORT}" NP64_ROOM="$CODE" \
     "$ARES" --system "Nintendo 64" "$ROM" >"/tmp/ares_$1.log" 2>&1 &
   echo $!
@@ -71,10 +111,7 @@ Start, L, R). Then:
     Title: press Start/A to enter the menus
     Main menu: go to MODE SELECT, choose ONLINE
     ONLINE screen: HOST GAME (A)  ->  the ROOM CODE (shared code if CODE= was set)
-    Pick the CLASS (50/100/150cc) on the GAME SELECT screen when choosing
-    ONLINE. In the lobby just press START; after character select the HOST
-    picks the track on the REAL course-select screen (cup, then course)
-    while joiners watch locked until the pick lands.
+    In the lobby: L / R to pick the COURSE, then press START to begin
 
   WINDOW 2 (bob) = JOIN
     Same path to the ONLINE screen, choose JOIN GAME (A)
@@ -89,15 +126,6 @@ Start, L, R). Then:
   LOCKSTEP: one shared simulation — same items, same collisions, same
   standings on both screens.
 
-  INDICATORS (v39):
-   - Online screens show the RELAY status line (CONNECTING / CONNECTED /
-     IN ROOM) under the ONLINE title.
-   - In-race YELLOW pulsing square (top-left) = waiting on a peer's
-     connection; do NOT quit — an unresponsive player is auto-removed
-     within ~15s and the race continues.
-   - In-race RED flashing square = the simulations have split (desync);
-     please report when you see it appear.
-
   LOCKSTEP NOTES (new engine):
    - If a window briefly FREEZES, it is waiting for the other player's input
      (network hiccup) — it resumes by itself.
@@ -105,26 +133,9 @@ Start, L, R). Then:
      bot and the race continues. This includes the HOST.
    - If the host quits before the race starts, joiners return to the online
      menu after ~3s.
-   - NEW in v20: item boxes give ITEMS to every player (up to 4), and the
-     pause menu works on both consoles (each player navigates with their
-     own controller; both press START to resume).
-   - NEW in v33: the lobby shows each player's PING next to their name
-     (green <60ms / yellow <120ms / red beyond) — measured through the
-     relay, so it is the real player-to-player round trip.
-   - NEW in v21: UNPAUSE is networked too — ONE player pressing START
-     resumes the race on every screen. A player who left the lobby no
-     longer freezes the race start (their seat becomes a CPU).
-   - NEW in v13: PAUSE is networked. Pressing START freezes the race on
-     EVERY screen (like split-screen); the other players wait until you
-     unpause. Pausing no longer desyncs the race (no more red square).
 
   TIP: run with a shared code so neither window types anything:
        CODE=RACE23 bash balthazar_online.sh
-
-AFTER PLAYING — send the diagnostic logs back (v15 records render/camera
-forensics into them; this is how the joiner ghosting bug gets solved):
-
-    scp /tmp/ares_alice.log /tmp/ares_bob.log jsuppe@${MELCHIOR}:/mnt/micron/jsuppe/netpak/fieldlogs/
 
 Per-instance logs:  /tmp/ares_alice.log   /tmp/ares_bob.log
   (look for "relay=${MELCHIOR}:${RELAYPORT}" and "LINK" / "room" lines)
