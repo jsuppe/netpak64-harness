@@ -87,7 +87,7 @@ launch() {  # $1=label (log name)  $2=home
   # First run defaults to "player" — set your name once in the menu.
   HOME="$2" NP64_ENABLE=1 NP64_LOG=1 \
     NP64_RELAY="${MELCHIOR}:${RELAYPORT}" NP64_ROOM="$CODE" \
-    "$ARES" --setting Input/Defocus=Allow --system "Nintendo 64" "$ROM" >"/tmp/ares_$1.log" 2>&1 &
+    "$ARES" --setting Input/Defocus=Block --system "Nintendo 64" "$ROM" >"/tmp/ares_$1.log" 2>&1 &
   echo $!
 }
 
