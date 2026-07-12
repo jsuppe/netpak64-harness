@@ -59,6 +59,7 @@ case "$SCEN" in
   pause-bob)       sleep 15; python3 /work/gdbpoke.py 9272 $PAUSE_AT 00000200 ;;
   pause-alice)     sleep 15; python3 /work/gdbpoke.py 9271 $PAUSE_AT 00000200 ;;
   pause-long-bob)  sleep 15; python3 /work/gdbpoke.py 9272 $PAUSE_LEN 000004b0 $PAUSE_AT 00000200 ;;
+  pause-quit-bob)  sleep 15; python3 /work/gdbpoke.py 9272 $PAUSE_LEN 00010064 $PAUSE_AT 00000200 ;;
   *) echo "unknown SCEN"; ;;
 esac
 
