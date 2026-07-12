@@ -60,6 +60,7 @@ case "$SCEN" in
   pause-alice)     sleep 15; python3 /work/gdbpoke.py 9271 $PAUSE_AT 00000200 ;;
   pause-long-bob)  sleep 15; python3 /work/gdbpoke.py 9272 $PAUSE_LEN 000004b0 $PAUSE_AT 00000200 ;;
   pause-quit-bob)  sleep 15; python3 /work/gdbpoke.py 9272 $PAUSE_LEN 00010064 $PAUSE_AT 00000200 ;;
+  quit-then-gone-bob) sleep 15; python3 /work/gdbpoke.py 9272 $PAUSE_LEN 00010014 $PAUSE_AT 00000200; sleep 6; kill -9 "${PIDS[bob]}"; echo "bob quit then killed (cannot rejoin)" ;;
   *) echo "unknown SCEN"; ;;
 esac
 
